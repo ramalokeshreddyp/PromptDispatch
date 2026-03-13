@@ -1,0 +1,512 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Prompt Router — AI Intent Classification</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    /* ------------------------------------------------------------------ */
+    /*  CSS Reset & Base                                                   */
+    /* ------------------------------------------------------------------ */
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    :root {
+      --glass-bg: rgba(255, 255, 255, 0.08);
+      --glass-border: rgba(255, 255, 255, 0.15);
+      --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.25);
+      --blur: 18px;
+      --radius: 18px;
+      --accent: #7c6aef;
+      --accent-glow: rgba(124, 106, 239, 0.45);
+      --text: #f0eef6;
+      --text-muted: #a9a3c0;
+      --bg-start: #0f0c29;
+      --bg-mid: #302b63;
+      --bg-end: #24243e;
+      --code-intent: #7c6aef;
+      --data-intent: #2dd4bf;
+      --writing-intent: #f472b6;
+      --career-intent: #fbbf24;
+      --unclear-intent: #94a3b8;
+      --transition: 0.3s cubic-bezier(.4,0,.2,1);
+    }
+
+    html { font-size: 16px; }
+
+    body {
+      font-family: 'Inter', system-ui, sans-serif;
+      background: linear-gradient(135deg, var(--bg-start), var(--bg-mid), var(--bg-end));
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* animated bg blobs */
+    body::before, body::after {
+      content: '';
+      position: fixed;
+      border-radius: 50%;
+      filter: blur(100px);
+      opacity: 0.35;
+      z-index: 0;
+      pointer-events: none;
+    }
+    body::before {
+      width: 500px; height: 500px;
+      background: var(--accent);
+      top: -120px; left: -80px;
+      animation: float 18s ease-in-out infinite alternate;
+    }
+    body::after {
+      width: 400px; height: 400px;
+      background: #2dd4bf;
+      bottom: -100px; right: -60px;
+      animation: float 22s ease-in-out infinite alternate-reverse;
+    }
+
+    @keyframes float {
+      0%   { transform: translate(0, 0) scale(1); }
+      100% { transform: translate(60px, 40px) scale(1.15); }
+    }
+
+    /* ------------------------------------------------------------------ */
+    /*  Layout                                                             */
+    /* ------------------------------------------------------------------ */
+    .app {
+      position: relative;
+      z-index: 1;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      max-width: 860px;
+      width: 100%;
+      margin: 0 auto;
+      padding: 20px 16px 16px;
+    }
+
+    /* ------------------------------------------------------------------ */
+    /*  Header                                                             */
+    /* ------------------------------------------------------------------ */
+    header {
+      text-align: center;
+      padding: 18px 0 10px;
+      flex-shrink: 0;
+    }
+    header h1 {
+      font-size: 1.6rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      background: linear-gradient(135deg, #7c6aef, #2dd4bf);
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+      color: transparent;
+    }
+    header p {
+      font-size: 0.82rem;
+      color: var(--text-muted);
+      margin-top: 4px;
+    }
+
+    /* ------------------------------------------------------------------ */
+    /*  Chat area                                                          */
+    /* ------------------------------------------------------------------ */
+    .chat-area {
+      flex: 1;
+      overflow-y: auto;
+      padding: 12px 4px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      scrollbar-width: thin;
+      scrollbar-color: rgba(255,255,255,0.12) transparent;
+    }
+    .chat-area::-webkit-scrollbar { width: 6px; }
+    .chat-area::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); border-radius: 3px; }
+
+    /* ------------------------------------------------------------------ */
+    /*  Message bubbles                                                    */
+    /* ------------------------------------------------------------------ */
+    .msg {
+      max-width: 78%;
+      padding: 14px 18px;
+      border-radius: var(--radius);
+      line-height: 1.55;
+      font-size: 0.9rem;
+      animation: fadeUp 0.35s var(--transition) both;
+      word-break: break-word;
+    }
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(12px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .msg.user {
+      align-self: flex-end;
+      background: linear-gradient(135deg, var(--accent), #5b4dc7);
+      border-bottom-right-radius: 4px;
+      color: #fff;
+    }
+
+    .msg.bot {
+      align-self: flex-start;
+      background: var(--glass-bg);
+      backdrop-filter: blur(var(--blur));
+      -webkit-backdrop-filter: blur(var(--blur));
+      border: 1px solid var(--glass-border);
+      box-shadow: var(--glass-shadow);
+      border-bottom-left-radius: 4px;
+    }
+
+    /* intent badge */
+    .intent-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 0.7rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      padding: 3px 10px;
+      border-radius: 20px;
+      margin-bottom: 8px;
+      backdrop-filter: blur(6px);
+    }
+    .intent-badge.code    { background: rgba(124,106,239,0.2); color: var(--code-intent); }
+    .intent-badge.data    { background: rgba(45,212,191,0.2);  color: var(--data-intent); }
+    .intent-badge.writing { background: rgba(244,114,182,0.2); color: var(--writing-intent); }
+    .intent-badge.career  { background: rgba(251,191,36,0.2);  color: var(--career-intent); }
+    .intent-badge.unclear { background: rgba(148,163,184,0.2); color: var(--unclear-intent); }
+
+    .confidence-bar {
+      width: 40px; height: 4px;
+      border-radius: 2px;
+      background: rgba(255,255,255,0.12);
+      overflow: hidden;
+      display: inline-block;
+      vertical-align: middle;
+    }
+    .confidence-bar-fill {
+      height: 100%;
+      border-radius: 2px;
+      transition: width 0.5s ease;
+    }
+
+    /* bot response body */
+    .msg.bot .response-body { white-space: pre-wrap; }
+    .msg.bot .response-body code {
+      background: rgba(255,255,255,0.07);
+      padding: 1px 5px;
+      border-radius: 4px;
+      font-size: 0.84rem;
+    }
+    .msg.bot .response-body pre {
+      background: rgba(0,0,0,0.35);
+      padding: 12px 14px;
+      border-radius: 10px;
+      overflow-x: auto;
+      margin: 8px 0;
+      font-size: 0.82rem;
+      line-height: 1.5;
+    }
+
+    /* typing indicator */
+    .typing { display: flex; gap: 5px; padding: 16px 20px; }
+    .typing span {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: var(--text-muted);
+      animation: bounce 1.3s infinite ease-in-out;
+    }
+    .typing span:nth-child(2) { animation-delay: 0.15s; }
+    .typing span:nth-child(3) { animation-delay: 0.3s; }
+    @keyframes bounce {
+      0%, 60%, 100% { transform: translateY(0); }
+      30% { transform: translateY(-8px); }
+    }
+
+    /* ------------------------------------------------------------------ */
+    /*  Input bar                                                          */
+    /* ------------------------------------------------------------------ */
+    .input-bar {
+      flex-shrink: 0;
+      display: flex;
+      gap: 10px;
+      padding: 12px 0 4px;
+    }
+
+    .input-bar textarea {
+      flex: 1;
+      resize: none;
+      padding: 14px 18px;
+      font-family: inherit;
+      font-size: 0.9rem;
+      color: var(--text);
+      background: var(--glass-bg);
+      backdrop-filter: blur(var(--blur));
+      -webkit-backdrop-filter: blur(var(--blur));
+      border: 1px solid var(--glass-border);
+      border-radius: 14px;
+      outline: none;
+      transition: border var(--transition), box-shadow var(--transition);
+      min-height: 50px;
+      max-height: 140px;
+      line-height: 1.45;
+    }
+    .input-bar textarea::placeholder { color: var(--text-muted); }
+    .input-bar textarea:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px var(--accent-glow);
+    }
+
+    .input-bar button {
+      width: 50px; height: 50px;
+      border: none;
+      border-radius: 14px;
+      cursor: pointer;
+      display: grid;
+      place-items: center;
+      background: linear-gradient(135deg, var(--accent), #5b4dc7);
+      color: #fff;
+      font-size: 1.2rem;
+      transition: transform var(--transition), box-shadow var(--transition);
+      flex-shrink: 0;
+      align-self: flex-end;
+    }
+    .input-bar button:hover { transform: scale(1.06); box-shadow: 0 4px 20px var(--accent-glow); }
+    .input-bar button:active { transform: scale(0.96); }
+    .input-bar button:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+    /* ------------------------------------------------------------------ */
+    /*  Utility                                                            */
+    /* ------------------------------------------------------------------ */
+    .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0,0,0,0); }
+
+    /* Quick-prompt chips */
+    .chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      justify-content: center;
+      padding: 6px 0 2px;
+      flex-shrink: 0;
+    }
+    .chip {
+      font-size: 0.75rem;
+      padding: 6px 14px;
+      border-radius: 20px;
+      border: 1px solid var(--glass-border);
+      background: var(--glass-bg);
+      backdrop-filter: blur(10px);
+      color: var(--text-muted);
+      cursor: pointer;
+      transition: all var(--transition);
+      white-space: nowrap;
+    }
+    .chip:hover { background: rgba(255,255,255,0.14); color: var(--text); border-color: var(--accent); transform: translateY(-1px); }
+
+    /* tiny footer */
+    footer {
+      text-align: center;
+      font-size: 0.68rem;
+      color: var(--text-muted);
+      padding: 6px 0 2px;
+      flex-shrink: 0;
+      opacity: 0.6;
+    }
+
+    /* Responsive */
+    @media (max-width: 600px) {
+      .app { padding: 12px 8px 8px; }
+      .msg { max-width: 92%; }
+      header h1 { font-size: 1.3rem; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="app">
+  <header>
+    <h1>&#x2728; Prompt Router</h1>
+    <p>AI-powered intent classification &amp; expert routing</p>
+  </header>
+
+  <!-- Quick-start chips -->
+  <div class="chips" id="chips">
+    <span class="chip" data-msg="How do I sort a list in Python?">Sort a list in Python</span>
+    <span class="chip" data-msg="What's the average of 12, 45, 23, 67, 34?">Compute an average</span>
+    <span class="chip" data-msg="My writing sounds too verbose, help me improve it.">Writing feedback</span>
+    <span class="chip" data-msg="I'm preparing for a job interview, any tips?">Interview tips</span>
+  </div>
+
+  <!-- Chat messages -->
+  <div class="chat-area" id="chatArea" role="log" aria-live="polite"></div>
+
+  <!-- Input -->
+  <form class="input-bar" id="inputBar" autocomplete="off">
+    <textarea id="userInput" placeholder="Ask anything — coding, data, writing, career…" rows="1" aria-label="Your message"></textarea>
+    <button type="submit" id="sendBtn" aria-label="Send message">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+    </button>
+  </form>
+
+  <footer>Prompt Router v1.0 &mdash; AI-Powered Intent Classification &amp; Expert Routing</footer>
+</div>
+
+<!-- ================================================================== -->
+<script>
+(() => {
+  const chatArea  = document.getElementById('chatArea');
+  const input     = document.getElementById('userInput');
+  const form      = document.getElementById('inputBar');
+  const sendBtn   = document.getElementById('sendBtn');
+  const chips     = document.getElementById('chips');
+
+  /* ---- Auto-resize textarea ---- */
+  input.addEventListener('input', () => {
+    input.style.height = 'auto';
+    input.style.height = Math.min(input.scrollHeight, 140) + 'px';
+  });
+
+  /* ---- Chip click ---- */
+  chips.addEventListener('click', (e) => {
+    const chip = e.target.closest('.chip');
+    if (!chip) return;
+    input.value = chip.dataset.msg;
+    input.dispatchEvent(new Event('input'));
+    input.focus();
+  });
+
+  /* ---- Submit ---- */
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const text = input.value.trim();
+    if (!text) return;
+    send(text);
+  });
+
+  /* Enter to send (Shift+Enter for newline) */
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      form.dispatchEvent(new Event('submit'));
+    }
+  });
+
+  /* ---- Core send ---- */
+  async function send(message) {
+    appendUser(message);
+    input.value = '';
+    input.style.height = 'auto';
+    sendBtn.disabled = true;
+    chips.style.display = 'none';
+
+    const loader = appendTyping();
+
+    try {
+      const res  = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message }),
+      });
+      const data = await res.json();
+      loader.remove();
+      appendBot(data);
+    } catch (err) {
+      loader.remove();
+      appendBot({ intent: 'unclear', confidence: 0, response: 'Network error — please try again.' });
+    } finally {
+      sendBtn.disabled = false;
+      input.focus();
+    }
+  }
+
+  /* ---- DOM helpers ---- */
+  function appendUser(text) {
+    const div = document.createElement('div');
+    div.className = 'msg user';
+    div.textContent = text;
+    chatArea.appendChild(div);
+    scrollDown();
+  }
+
+  function appendBot({ intent, confidence, response }) {
+    const div = document.createElement('div');
+    div.className = 'msg bot';
+
+    // Badge
+    const badge = document.createElement('div');
+    badge.className = `intent-badge ${intent}`;
+    const pct = Math.round(confidence * 100);
+    badge.innerHTML = `
+      ${intentIcon(intent)} ${intent}
+      <span class="confidence-bar">
+        <span class="confidence-bar-fill" style="width:${pct}%;background:${intentColor(intent)}"></span>
+      </span>
+      ${pct}%
+    `;
+    div.appendChild(badge);
+
+    // Body — render simple markdown-like formatting
+    const body = document.createElement('div');
+    body.className = 'response-body';
+    body.innerHTML = renderMarkdown(response);
+    div.appendChild(body);
+
+    chatArea.appendChild(div);
+    scrollDown();
+  }
+
+  function appendTyping() {
+    const div = document.createElement('div');
+    div.className = 'msg bot typing';
+    div.innerHTML = '<span></span><span></span><span></span>';
+    chatArea.appendChild(div);
+    scrollDown();
+    return div;
+  }
+
+  function scrollDown() {
+    requestAnimationFrame(() => chatArea.scrollTop = chatArea.scrollHeight);
+  }
+
+  /* ---- Minimal Markdown renderer ---- */
+  function renderMarkdown(text) {
+    // Escape HTML first
+    let s = text
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+
+    // Fenced code blocks
+    s = s.replace(/```(\w*)\n([\s\S]*?)```/g, (_, lang, code) =>
+      `<pre><code>${code.trim()}</code></pre>`);
+
+    // Inline code
+    s = s.replace(/`([^`]+)`/g, '<code>$1</code>');
+
+    // Bold
+    s = s.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+
+    // Italic
+    s = s.replace(/\*(.+?)\*/g, '<em>$1</em>');
+
+    return s;
+  }
+
+  /* ---- Intent helpers ---- */
+  function intentIcon(i) {
+    return { code: '&#128187;', data: '&#128202;', writing: '&#9997;&#65039;', career: '&#128188;', unclear: '&#129300;' }[i] || '&#10067;';
+  }
+  function intentColor(i) {
+    return { code: '#7c6aef', data: '#2dd4bf', writing: '#f472b6', career: '#fbbf24', unclear: '#94a3b8' }[i] || '#94a3b8';
+  }
+})();
+</script>
+</body>
+</html>
