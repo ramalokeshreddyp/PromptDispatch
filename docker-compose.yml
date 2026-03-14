@@ -3,10 +3,12 @@ services:
     build: .
     ports:
       - "8000:8000"
-    env_file:
-      - .env
     volumes:
       - ./logs:/app/logs
     environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - CLASSIFIER_MODEL=${CLASSIFIER_MODEL:-gpt-4o-mini}
+      - GENERATOR_MODEL=${GENERATOR_MODEL:-gpt-4o-mini}
+      - CONFIDENCE_THRESHOLD=${CONFIDENCE_THRESHOLD:-0.7}
       - LOG_FILE=/app/logs/route_log.jsonl
     restart: unless-stopped

@@ -37,6 +37,9 @@ copy .env.example .env          # then edit .env
 # Option A: Docker
 docker compose up --build
 
+# (Optional) If you do not create .env, the app still starts,
+# but OpenAI-backed responses require OPENAI_API_KEY.
+
 # Option B: Local Python
 python -m venv .venv
 .venv\Scripts\activate
@@ -96,3 +99,33 @@ Prompt-Router/
 - [API Reference](docs/api-reference.md)
 - [Setup Guide](docs/setup.md)
 - [Testing Guide](docs/testing.md)
+- [Project Documentation](docs/projectdocumentation.md)
+
+## Submission Checklist
+
+This repository includes all required submission artifacts:
+
+- Application code in `app/` and `tests/`
+- `Dockerfile` for container image build
+- `docker-compose.yml` for one-command run
+- `.env.example` with all required environment variables
+- `route_log.jsonl` generated from test traffic
+- Comprehensive documentation in this README plus `docs/`
+
+## Quick Verification Before Submit
+
+```bash
+# 1) Build and run containerized app
+docker compose up --build
+
+# 2) Health check
+curl http://localhost:8000/api/health
+
+# 3) Send test prompt
+curl -X POST http://localhost:8000/api/chat \
+    -H "Content-Type: application/json" \
+    -d '{"message":"how do i sort a list of objects in python?"}'
+
+# 4) Confirm route log file exists and has JSONL entries
+type route_log.jsonl
+```

@@ -11,7 +11,7 @@ import os
 import re
 from typing import Any
 
-from openai import AsyncOpenAI
+from openai import AsyncOpenAI, OpenAIError
 
 from app.prompts import CLASSIFIER_PROMPT, CLARIFICATION_PROMPT, EXPERT_PROMPTS
 from app.logger import log_route
@@ -19,13 +19,25 @@ from app.logger import log_route
 # ---------------------------------------------------------------------------
 # OpenAI client  (reads OPENAI_API_KEY from env automatically)
 # ---------------------------------------------------------------------------
-client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+def _build_client() -> AsyncOpenAI | None:
+    """Create an OpenAI client, returning None when API key is unavailable."""
+    try:
+        return AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+    except OpenAIError:
+        return None
+
+
+client = _build_client()
 
 CLASSIFIER_MODEL = os.getenv("CLASSIFIER_MODEL", "gpt-4o-mini")
 GENERATOR_MODEL = os.getenv("GENERATOR_MODEL", "gpt-4o-mini")
 CONFIDENCE_THRESHOLD = float(os.getenv("CONFIDENCE_THRESHOLD", "0.7"))
 
 VALID_INTENTS = set(EXPERT_PROMPTS.keys()) | {"unclear"}
+UNCLEAR_QUESTION = (
+    "Are you asking for help with coding, data analysis, writing feedback, "
+    "or career advice?"
+)
 
 # Regex to detect manual override prefix like @code, @data, etc.
 OVERRIDE_PATTERN = re.compile(
@@ -68,6 +80,9 @@ async def classify_intent(message: str) -> dict[str, Any]:
     Call the LLM to classify a user message into one of the known intents.
     Returns {"intent": str, "confidence": float}.
     """
+    if client is None:
+        return {"intent": "unclear", "confidence": 0.0}
+
     try:
         response = await client.chat.completions.create(
             model=CLASSIFIER_MODEL,
@@ -101,9 +116,28 @@ async def route_and_respond(message: str, intent: dict[str, Any]) -> str:
     confidence = intent["confidence"]
 
     if label == "unclear":
-        system_prompt = CLARIFICATION_PROMPT
-    else:
-        system_prompt = EXPERT_PROMPTS.get(label, CLARIFICATION_PROMPT)
+        final_text = UNCLEAR_QUESTION
+
+        # Log every routing decision, including clarification fallbacks.
+        log_route(
+            intent=label,
+            confidence=confidence,
+            user_message=message,
+            final_response=final_text,
+        )
+        return final_text
+
+    system_prompt = EXPERT_PROMPTS.get(label, CLARIFICATION_PROMPT)
+
+    if client is None:
+        final_text = "Sorry, the AI service is not configured. Please set OPENAI_API_KEY and try again."
+        log_route(
+            intent=label,
+            confidence=confidence,
+            user_message=message,
+            final_response=final_text,
+        )
+        return final_text
 
     try:
         response = await client.chat.completions.create(
