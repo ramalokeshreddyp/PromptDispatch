@@ -92,6 +92,111 @@ def _is_greeting(message: str) -> bool:
     }
 
 
+def _classifier_error_result(exc: Exception | None = None) -> dict[str, Any]:
+    result: dict[str, Any] = {"intent": "unclear", "confidence": 0.0}
+    if exc is None:
+        result["classifier_error"] = (
+            "Sorry, the AI service is not configured. Please set OPENAI_API_KEY and try again."
+        )
+        return result
+
+    error_text = str(exc).lower()
+    if "insufficient_quota" in error_text or "429" in error_text or "quota" in error_text:
+        result["classifier_error"] = (
+            "Sorry, the AI service is unavailable because the OpenAI quota has been exceeded. "
+            "Please check billing and try again."
+        )
+    elif "api key" in error_text or "authentication" in error_text or "invalid_api_key" in error_text:
+        result["classifier_error"] = (
+            "Sorry, the AI service could not authenticate with OpenAI. "
+            "Please verify OPENAI_API_KEY and try again."
+        )
+    else:
+        result["classifier_error"] = (
+            "Sorry, the AI service is temporarily unavailable. Please try again shortly."
+        )
+    return result
+
+
+def _contains_any(text: str, phrases: list[str]) -> bool:
+    return any(phrase in text for phrase in phrases)
+
+
+def _heuristic_classify(message: str) -> dict[str, Any]:
+    text = message.lower().strip()
+    compact = re.sub(r"\s+", " ", text)
+
+    if not compact or _is_greeting(compact):
+        return {"intent": "unclear", "confidence": 0.0}
+
+    if _contains_any(compact, ["poem", "poetry", "story", "lyrics", "joke"]):
+        return {"intent": "unclear", "confidence": 0.0}
+
+    matches: set[str] = set()
+
+    code_phrases = [
+        "python",
+        "sql query",
+        "function",
+        "bug",
+        "debug",
+        "fix this",
+        "sort a list",
+        "sort a list of objects",
+        "print(i)",
+        "list comprehension",
+        "code",
+    ]
+    data_phrases = [
+        "average",
+        "median",
+        "mean",
+        "pivot table",
+        "dataset",
+        "data",
+        "statistics",
+        "numbers:",
+        "numbers ",
+    ]
+    writing_phrases = [
+        "paragraph",
+        "sentence",
+        "professional",
+        "verbose",
+        "writing",
+        "awkward",
+        "clarity",
+        "tone",
+        "rewrite",
+    ]
+    career_phrases = [
+        "job interview",
+        "interview",
+        "career",
+        "resume",
+        "cover letter",
+        "switch jobs",
+        "promotion",
+    ]
+
+    if _contains_any(compact, code_phrases):
+        matches.add("code")
+    if _contains_any(compact, data_phrases):
+        matches.add("data")
+    if _contains_any(compact, writing_phrases):
+        matches.add("writing")
+    if _contains_any(compact, career_phrases):
+        matches.add("career")
+
+    if len(matches) > 1:
+        return {"intent": "unclear", "confidence": 0.0}
+
+    if len(matches) == 1:
+        return {"intent": next(iter(matches)), "confidence": 0.84}
+
+    return {"intent": "unclear", "confidence": 0.0}
+
+
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
@@ -101,7 +206,12 @@ async def classify_intent(message: str) -> dict[str, Any]:
     Returns {"intent": str, "confidence": float}.
     """
     if client is None:
-        return {"intent": "unclear", "confidence": 0.0}
+        heuristic = _heuristic_classify(message)
+        if heuristic["intent"] != "unclear":
+            return heuristic
+        fallback = _classifier_error_result()
+        fallback.update(heuristic)
+        return fallback
 
     try:
         response = await client.chat.completions.create(
@@ -122,9 +232,13 @@ async def classify_intent(message: str) -> dict[str, Any]:
 
         return result
 
-    except Exception:
-        # Network / auth / rate-limit errors → safe fallback
-        return {"intent": "unclear", "confidence": 0.0}
+    except Exception as exc:
+        heuristic = _heuristic_classify(message)
+        if heuristic["intent"] != "unclear":
+            return heuristic
+        fallback = _classifier_error_result(exc)
+        fallback.update(heuristic)
+        return fallback
 
 
 async def route_and_respond(message: str, intent: dict[str, Any]) -> str:
@@ -136,7 +250,10 @@ async def route_and_respond(message: str, intent: dict[str, Any]) -> str:
     confidence = intent["confidence"]
 
     if label == "unclear":
-        final_text = GREETING_RESPONSE if _is_greeting(message) else UNCLEAR_QUESTION
+        if _is_greeting(message):
+            final_text = GREETING_RESPONSE
+        else:
+            final_text = intent.get("classifier_error", UNCLEAR_QUESTION)
 
         # Log every routing decision, including clarification fallbacks.
         log_route(

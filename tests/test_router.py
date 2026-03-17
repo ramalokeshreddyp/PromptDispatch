@@ -4,7 +4,7 @@ and prints the classified intent + confidence for each.
 
 Usage:
     python tests/test_router.py
-    (server must be running at http://localhost:8000)
+    (server must be running at http://127.0.0.1:8000)
 """
 
 import json
@@ -12,7 +12,7 @@ import sys
 import urllib.request
 import urllib.error
 
-API_URL = "http://localhost:8000/api/chat"
+API_URL = "http://127.0.0.1:8000/api/chat"
 
 TEST_MESSAGES = [
     ("how do i sort a list of objects in python?", "code"),
