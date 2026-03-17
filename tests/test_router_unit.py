@@ -56,6 +56,11 @@ class RouterUnitTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(result, {"intent": "unclear", "confidence": 0.0})
 
+    def test_heuristic_classify_cpp_routes_to_code(self):
+        result = router._heuristic_classify("c++ coding")
+        self.assertEqual(result["intent"], "code")
+        self.assertGreaterEqual(result["confidence"], 0.7)
+
     async def test_classify_intent_without_client_uses_heuristic_match(self):
         with patch.object(router, "client", None):
             result = await router.classify_intent("sort a python list")

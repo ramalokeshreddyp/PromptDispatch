@@ -131,6 +131,9 @@ def _heuristic_classify(message: str) -> dict[str, Any]:
     matches: set[str] = set()
 
     code_phrases = [
+        "c++",
+        "cpp",
+        "c plus plus",
         "python",
         "sql query",
         "function",
@@ -281,7 +284,19 @@ async def route_and_respond(message: str, intent: dict[str, Any]) -> str:
         )
         final_text = response.choices[0].message.content or ""
     except Exception as exc:
-        final_text = f"Sorry, something went wrong while generating a response: {exc}"
+        error_text = str(exc).lower()
+        if "insufficient_quota" in error_text or "429" in error_text or "quota" in error_text:
+            final_text = (
+                "Sorry, I cannot generate a full expert response right now because the OpenAI quota "
+                "has been exceeded. Please check billing and try again."
+            )
+        elif "api key" in error_text or "authentication" in error_text or "invalid_api_key" in error_text:
+            final_text = (
+                "Sorry, I cannot generate a full expert response because OpenAI authentication failed. "
+                "Please verify OPENAI_API_KEY and try again."
+            )
+        else:
+            final_text = "Sorry, something went wrong while generating a response. Please try again."
 
     # Log every routing decision
     log_route(
