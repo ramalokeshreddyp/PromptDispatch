@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PromptDispatch</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg-1: #0f172a;
+      --bg-2: #1e293b;
+      --bg-3: #0b1120;
+      --card: rgba(255, 255, 255, 0.08);
+      --line: rgba(255, 255, 255, 0.18);
+      --text: #e2e8f0;
+      --muted: #94a3b8;
+      --accent: #22c55e;
+      --accent-2: #16a34a;
+      --radius: 16px;
+    }
+
+    body {
+      min-height: 100vh;
+      font-family: "Inter", system-ui, sans-serif;
+      color: var(--text);
+      background: radial-gradient(circle at 20% 15%, #0b3a2d 0%, transparent 25%),
+                  radial-gradient(circle at 80% 85%, #1d4d3c 0%, transparent 30%),
+                  linear-gradient(135deg, var(--bg-1), var(--bg-2), var(--bg-3));
+      display: flex;
+      justify-content: center;
+      padding: 18px;
+    }
+
+    .app {
+      width: min(940px, 100%);
+      height: calc(100vh - 36px);
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .panel {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+    }
+
+    .top {
+      padding: 16px;
+      display: grid;
+      gap: 10px;
+    }
+
+    h1 {
+      font-size: 1.4rem;
+      letter-spacing: -0.02em;
+    }
+
+    .sub {
+      color: var(--muted);
+      font-size: 0.88rem;
+    }
+
+    .api-row {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 8px;
+    }
+
+    .api-row input, .chat-input textarea {
+      border: 1px solid var(--line);
+      background: rgba(0, 0, 0, 0.2);
+      color: var(--text);
+      border-radius: 12px;
+      outline: none;
+      padding: 11px 12px;
+      font: inherit;
+    }
+
+    .api-row button, .chat-input button {
+      border: none;
+      border-radius: 12px;
+      background: linear-gradient(120deg, var(--accent), var(--accent-2));
+      color: #052e16;
+      font-weight: 700;
+      cursor: pointer;
+      padding: 0 14px;
+    }
+
+    .status {
+      color: #bbf7d0;
+      font-size: 0.8rem;
+      min-height: 1em;
+    }
+
+    .chat {
+      flex: 1;
+      padding: 12px;
+      overflow: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .msg {
+      max-width: 85%;
+      border-radius: 14px;
+      padding: 12px 14px;
+      line-height: 1.45;
+      font-size: 0.92rem;
+      animation: slide 0.2s ease;
+    }
+
+    @keyframes slide {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .msg.user {
+      align-self: flex-end;
+      background: linear-gradient(120deg, #166534, #15803d);
+      color: #ecfdf5;
+    }
+
+    .msg.bot {
+      align-self: flex-start;
+      background: rgba(15, 23, 42, 0.7);
+      border: 1px solid var(--line);
+    }
+
+    .meta {
+      font-size: 0.75rem;
+      color: var(--muted);
+      margin-bottom: 6px;
+    }
+
+    .chat-input {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 8px;
+      padding: 12px;
+    }
+
+    .chat-input textarea {
+      resize: none;
+      min-height: 48px;
+      max-height: 130px;
+    }
+
+    .chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 2px;
+    }
+
+    .chip {
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 6px 10px;
+      background: rgba(0, 0, 0, 0.18);
+      color: var(--muted);
+      font-size: 0.78rem;
+      cursor: pointer;
+    }
+
+    @media (max-width: 640px) {
+      .app { height: calc(100vh - 20px); }
+      body { padding: 10px; }
+      .api-row, .chat-input { grid-template-columns: 1fr; }
+      .api-row button, .chat-input button { min-height: 44px; }
+    }
+  </style>
+</head>
+<body>
+  <main class="app">
+    <section class="panel top">
+      <h1>PromptDispatch LLM Router</h1>
+      <p class="sub">This is the live chat UI. It sends messages to your deployed backend /api/chat, which classifies intent and routes to an expert persona.</p>
+      <div class="api-row">
+        <input id="apiBase" placeholder="Backend URL (example: https://your-backend.onrender.com)" />
+        <button id="saveApi" type="button">Set API</button>
+      </div>
+      <p id="status" class="status"></p>
+      <div class="chips" id="chips">
+        <button class="chip" data-msg="How do I sort a list of objects in Python?" type="button">Python sorting</button>
+        <button class="chip" data-msg="Give me a SQL query to find monthly active users" type="button">Data query</button>
+        <button class="chip" data-msg="Improve this paragraph for clarity and tone" type="button">Writing help</button>
+        <button class="chip" data-msg="How should I prepare for a backend interview?" type="button">Career advice</button>
+      </div>
+    </section>
+
+    <section id="chat" class="panel chat" aria-live="polite"></section>
+
+    <form id="chatForm" class="panel chat-input">
+      <textarea id="message" placeholder="Ask PromptDispatch..."></textarea>
+      <button id="send" type="submit">Send</button>
+    </form>
+  </main>
+
+  <script>
+    const chat = document.getElementById("chat");
+    const form = document.getElementById("chatForm");
+    const input = document.getElementById("message");
+    const apiBaseInput = document.getElementById("apiBase");
+    const saveApiBtn = document.getElementById("saveApi");
+    const status = document.getElementById("status");
+    const chips = document.getElementById("chips");
+
+    const API_KEY = "promptdispatch_api_base";
+
+    function defaultApiBase() {
+      if (location.hostname.includes("github.io")) {
+        return "";
+      }
+      return location.origin;
+    }
+
+    function getApiBase() {
+      return localStorage.getItem(API_KEY) || defaultApiBase();
+    }
+
+    function setApiBase(value) {
+      localStorage.setItem(API_KEY, value);
+      apiBaseInput.value = value;
+      status.textContent = value
+        ? "API set to: " + value
+        : "Set your backend URL to enable LLM responses.";
+    }
+
+    function addMessage(role, text, meta = "") {
+      const item = document.createElement("article");
+      item.className = "msg " + role;
+
+      if (meta) {
+        const m = document.createElement("div");
+        m.className = "meta";
+        m.textContent = meta;
+        item.appendChild(m);
+      }
+
+      const body = document.createElement("div");
+      body.textContent = text;
+      item.appendChild(body);
+
+      chat.appendChild(item);
+      chat.scrollTop = chat.scrollHeight;
+    }
+
+    saveApiBtn.addEventListener("click", () => {
+      setApiBase(apiBaseInput.value.trim());
+    });
+
+    chips.addEventListener("click", (event) => {
+      const chip = event.target.closest(".chip");
+      if (!chip) return;
+      input.value = chip.getAttribute("data-msg") || "";
+      input.focus();
+    });
+
+    input.addEventListener("input", () => {
+      input.style.height = "auto";
+      input.style.height = Math.min(input.scrollHeight, 130) + "px";
+    });
+
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const message = input.value.trim();
+      if (!message) return;
+
+      const base = getApiBase();
+      if (!base) {
+        status.textContent = "Set API URL first so the chat can reach your LLM backend.";
+        return;
+      }
+
+      addMessage("user", message);
+      input.value = "";
+      input.style.height = "auto";
+
+      const sendBtn = document.getElementById("send");
+      sendBtn.disabled = true;
+
+      try {
+        const response = await fetch(base.replace(/\/$/, "") + "/api/chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ message }),
+        });
+
+        if (!response.ok) {
+          throw new Error("HTTP " + response.status);
+        }
+
+        const data = await response.json();
+        const confidence = typeof data.confidence === "number"
+          ? "confidence " + Math.round(data.confidence * 100) + "%"
+          : "confidence n/a";
+        addMessage("bot", data.response || "No response.", "intent: " + (data.intent || "unknown") + " | " + confidence);
+      } catch (error) {
+        addMessage("bot", "Unable to reach backend. Check API URL and CORS settings.", "network error");
+      } finally {
+        sendBtn.disabled = false;
+        input.focus();
+      }
+    });
+
+    const initial = getApiBase();
+    apiBaseInput.value = initial;
+    status.textContent = initial
+      ? "API set to: " + initial
+      : "Set your backend URL to enable LLM responses.";
+
+    addMessage("bot", "PromptDispatch is ready. Set the API URL above if this page is hosted on GitHub Pages.", "system");
+  </script>
+</body>
+</html>

@@ -49,6 +49,8 @@ uvicorn app.main:app --reload
 
 Open **http://localhost:8000** — you'll see the chat UI.
 
+For GitHub Pages frontend hosting, open your site root (`/index.html` in this repo), set your deployed backend URL, and chat there.
+
 ## Features
 
 - **4 Expert Personas** — Code, Data, Writing, Career — each with a focused system prompt
@@ -92,6 +94,7 @@ Prompt-Router/
 | `CLASSIFIER_MODEL`    | No       | `gpt-4o-mini`   |
 | `GENERATOR_MODEL`     | No       | `gpt-4o-mini`   |
 | `CONFIDENCE_THRESHOLD`| No       | `0.7`            |
+| `ALLOWED_ORIGINS`     | No       | `http://localhost:8000,http://127.0.0.1:8000,http://localhost:5500,https://ramalokeshreddyp.github.io` |
 
 ## Docs
 

@@ -2,10 +2,13 @@
 FastAPI application — serves the API and the glassmorphism web UI.
 """
 
+import os
+
 from dotenv import load_dotenv
 load_dotenv()  # load .env before any module reads os.getenv
 
 from fastapi import FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
@@ -17,6 +20,27 @@ app = FastAPI(
     title="Prompt Router",
     version="1.0.0",
     description="AI-powered intent classification and expert routing service",
+)
+
+
+def _allowed_origins() -> list[str]:
+    raw = os.getenv("ALLOWED_ORIGINS", "")
+    if raw.strip():
+        return [origin.strip() for origin in raw.split(",") if origin.strip()]
+    return [
+        "http://localhost:8000",
+        "http://127.0.0.1:8000",
+        "http://localhost:5500",
+        "https://ramalokeshreddyp.github.io",
+    ]
+
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=_allowed_origins(),
+    allow_credentials=False,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 
