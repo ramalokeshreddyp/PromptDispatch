@@ -70,6 +70,19 @@ class RouterUnitTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(entry["user_message"], "help me")
         self.assertEqual(entry["final_response"], result)
 
+    async def test_route_and_respond_greeting_returns_welcome_message(self):
+        result = await router.route_and_respond(
+            "hi",
+            {"intent": "unclear", "confidence": 0.0},
+        )
+
+        self.assertIn("I can help with coding", result)
+        self.assertIn("@code", result)
+
+        entries = self._read_log_entries()
+        self.assertEqual(len(entries), 1)
+        self.assertEqual(entries[0]["final_response"], result)
+
 
 if __name__ == "__main__":
     unittest.main()
