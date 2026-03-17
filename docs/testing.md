@@ -2,6 +2,8 @@
 
 ## Quick Test (CLI)
 
+Note: full LLM-backed routing requires a valid `OPENAI_API_KEY`. Without it, the app will fall back to safe `unclear` behavior or return a configuration error for forced expert routes.
+
 With the server running, you can hit the API directly:
 
 ```bash

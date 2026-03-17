@@ -39,7 +39,7 @@ Health check.
 **Response**
 
 ```json
-{ "status": "ok" }
+{ "status": "ok", "version": "1.0.0" }
 ```
 
 ---
@@ -47,6 +47,8 @@ Health check.
 ### `GET /`
 
 Serves the web UI (glassmorphism chat interface).
+
+For GitHub Pages hosting, the repository root `index.html` provides a static frontend that calls the deployed backend `/api/chat` endpoint.
 
 ---
 
