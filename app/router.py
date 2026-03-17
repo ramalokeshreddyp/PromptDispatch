@@ -38,10 +38,6 @@ UNCLEAR_QUESTION = (
     "Are you asking for help with coding, data analysis, writing feedback, "
     "or career advice?"
 )
-GREETING_RESPONSE = (
-    "Hi. I can help with coding, data analysis, writing feedback, or career advice. "
-    "Tell me what you need, or start with @code, @data, @writing, or @career."
-)
 
 # Regex to detect manual override prefix like @code, @data, etc.
 OVERRIDE_PATTERN = re.compile(
@@ -250,10 +246,7 @@ async def route_and_respond(message: str, intent: dict[str, Any]) -> str:
     confidence = intent["confidence"]
 
     if label == "unclear":
-        if _is_greeting(message):
-            final_text = GREETING_RESPONSE
-        else:
-            final_text = intent.get("classifier_error", UNCLEAR_QUESTION)
+        final_text = UNCLEAR_QUESTION
 
         # Log every routing decision, including clarification fallbacks.
         log_route(
